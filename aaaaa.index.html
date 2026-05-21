@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>交通號誌 FSM 模擬器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+        /* 控制面板 */
+        .control-panel {
+            background: #1e293b;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .control-panel input {
+            width: 60px;
+            padding: 5px;
+            font-size: 16px;
+            text-align: center;
+            border-radius: 5px;
+            border: none;
+        }
+        .control-panel button {
+            padding: 6px 15px;
+            font-size: 16px;
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .control-panel button:hover { background-color: #dc2626; }
+        
+        /* 狀態看板 */
+        .status-board {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 20px;
+        }
+
+        /* 十字路口硬體模擬版 */
+        .board {
+            position: relative;
+            width: 450px;
+            height: 450px;
+            background-color: #475569;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+        /* 中央倒數計時器 */
+        .counter {
+            position: absolute;
+            top: 195px; left: 195px;
+            width: 60px; height: 60px;
+            background: #0f172a;
+            color: #00ff00;
+            font-size: 36px;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            border: 2px solid #334155;
+        }
+
+        /* 燈具盒子 */
+        .light-box {
+            position: absolute;
+            background: #1e293b;
+            padding: 8px;
+            border-radius: 8px;
+            display: flex;
+            gap: 8px;
+        }
+        .light {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: #334155; /* 預設暗燈 */
+        }
+        
+        /* 四個方向的位置 */
+        .box-n { top: 40px; left: 180px; flex-direction: row; }  /* 北 */
+        .box-s { bottom: 40px; left: 180px; flex-direction: row; } /* 南 */
+        .box-e { top: 180px; right: 40px; flex-direction: column; } /* 東 */
+        .box-w { top: 180px; left: 40px; flex-direction: column; }  /* 西 */
+
+        /* 點亮顏色 */
+        .r.active { background: #ff0000; box-shadow: 0 0 15px #ff0000; }
+        .y.active { background: #ffff00; box-shadow: 0 0 15px #ffff00; }
+        .g.active { background: #00ff00; box-shadow: 0 0 15px #00ff00; }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <label>綠燈秒數：</label>
+        <input type="number" id="green-input" value="8" min="2">
+        <label>黃燈秒數：</label>
+        <input type="number" id="yellow-input" value="4" min="2">
+        <button onclick="resetFSM()">系統重製 (Reset)</button>
+    </div>
+
+    <div class="status-board">
+        目前狀態：<span id="state-text" style="color: #dc2626;">S0 (南北綠燈，東西紅燈)</span>
+    </div>
+
+    <div class="board">
+        <div class="counter" id="timer-display">8</div>
+
+        <div class="light-box box-n">
+            <div class="light r" id="r1"></div>
+            <div class="light y" id="y1"></div>
+            <div class="light g" id="g1"></div>
+        </div>
+
+        <div class="light-box box-s">
+            <div class="light r" id="r3"></div>
+            <div class="light y" id="y3"></div>
+            <div class="light g" id="g3"></div>
+        </div>
+
+        <div class="light-box box-e">
+            <div class="light r" id="r2"></div>
+            <div class="light y" id="y2"></div>
+            <div class="light g" id="g2"></div>
+        </div>
+
+        <div class="light-box box-w">
+            <div class="light r" id="r4"></div>
+            <div class="light y" id="y4"></div>
+            <div class="light g" id="g4"></div>
+        </div>
+    </div>
+
+    <script>
+        let state = 0; // S0=南北綠, S1=南北黃, S2=東西綠, S3=東西黃
+        let timer = 0;
+
+        function getGSec() { return parseInt(document.getElementById('green-input').value) || 8; }
+        function getYSec() { return parseInt(document.getElementById('yellow-input').value) || 4; }
+
+        function resetFSM() {
+            state = 0;
+            timer = getGSec();
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.querySelectorAll('.light').forEach(l => l.classList.remove('active'));
+            document.getElementById('timer-display').innerText = timer;
+            const stateText = document.getElementById('state-text');
+
+            if (state === 0) {
+                stateText.innerText = "S0 (南北綠燈，東西紅燈)";
+                document.getElementById('g1').classList.add('active');
+                document.getElementById('g3').classList.add('active');
+                document.getElementById('r2').classList.add('active');
+                document.getElementById('r4').classList.add('active');
+            } else if (state === 1) {
+                stateText.innerText = "S1 (南北黃燈，東西紅燈)";
+                document.getElementById('y1').classList.add('active');
+                document.getElementById('y3').classList.add('active');
+                document.getElementById('r2').classList.add('active');
+                document.getElementById('r4').classList.add('active');
+            } else if (state === 2) {
+                stateText.innerText = "S2 (南北紅燈，東西綠燈)";
+                document.getElementById('r1').classList.add('active');
+                document.getElementById('r3').classList.add('active');
+                document.getElementById('g2').classList.add('active');
+                document.getElementById('g4').classList.add('active');
+            } else if (state === 3) {
+                stateText.innerText = "S3 (南北紅燈，東西黃燈)";
+                document.getElementById('r1').classList.add('active');
+                document.getElementById('r3').classList.add('active');
+                document.getElementById('y2').classList.add('active');
+                document.getElementById('y4').classList.add('active');
+            }
+        }
+
+        function tick() {
+            if (timer <= 1) {
+                if (state === 0) { state = 1; timer = getYSec(); }
+                else if (state === 1) { state = 2; timer = getGSec(); }
+                else if (state === 2) { state = 3; timer = getYSec(); }
+                else if (state === 3) { state = 0; timer = getGSec(); }
+            } else {
+                timer--;
+            }
+            updateDisplay();
+        }
+
+        resetFSM();
+        setInterval(tick, 1000);
+    </script>
+</body>
+</html>
